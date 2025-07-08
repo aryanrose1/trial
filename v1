@@ -1,5 +1,4 @@
-from pymodbus.client import ModbusSerialClient
-from pymodbus.framer import ModbusRtuFramer
+from pymodbus.client.sync import ModbusSerialClient
 from functools import partial
 import tkinter as tk
 import sys, os
@@ -91,14 +90,14 @@ try:
             if port is not None:
                 self.disconnected = False
                 self.client = ModbusSerialClient(
-        port=args.O2_port,
-        baudrate=9600,
-        bytesize=8,
-        parity="N",
-                   stopbits=1,
-                   timeout=.2,
-                   framer=ModbusRtuFramer
-               )
+                port=args.O2_port,
+                baudrate=9600,
+                bytesize=8,
+                parity="N",
+                stopbits=1,
+                timeout=.2,
+                framer=ModbusRtuFramer
+            )
 
 
             self.oxygen_value = -1.0
@@ -144,8 +143,10 @@ try:
                         slope = (percent_3 - percent_2) / (current_3 - current_2)
                         intercept = percent_3 - slope * current_3
                         mapped_value = slope * ch1 + intercept
+
                     self.oxygen_value = f"{mapped_value:.2f}"
-                self.client.close()
+                    self.client.close()
+
             except:
                 self.oxygen_value = "ERR"
                 self.disconnected = True
