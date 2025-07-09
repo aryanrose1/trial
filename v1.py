@@ -96,7 +96,7 @@ try:
                 parity="N",
                 stopbits=1,
                 timeout=.2,
-                framer=ModbusRtuFramer
+                method='rtu
             )
 
 
@@ -469,5 +469,21 @@ try:
         finally:
             app.server.stop()
 
+    def on_closing():
+        try:
+            controller.arduino_serial_port.close()
+        except:
+            pass
+        app.destroy()
+
+    time.sleep(2)
+    if __name__ == "__main__":
+        app = App()
+        app.protocol("WM_DELETE_WINDOW", on_closing)
+        try:
+            app.mainloop()
+        finally:
+            app.server.stop()
+            
 except Exception as e:
     traceback.print_exc()
