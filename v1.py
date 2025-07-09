@@ -329,6 +329,9 @@ try:
 
             self.update_values()
 
+        def update_status(self, status_text):
+            self.status_label.config(text=f"Status: {status_text}")
+
         # Code for implementing ORP setpoint control value setter
         def send_orp_setpoint(self):
             value = self.orp_setpoint_entry.get()
@@ -342,18 +345,121 @@ try:
 
 # Lines below need to be checked
 
-        def update_values(self):
-            # SAME as before, plus:
-            # After parsing ORP add:
-            # self.orp_valve_display.update_value("OPEN"/"CLOSED") logic as needed
-            pass
+        def update_indicators(self, status_bits):
+            on_text = ""
+            off_text = ""
+            global controller_log_entry
+            global sonde_log_entry
+            controller_log_entry =""
+            if controller.disconnected:
+                 for i in range(1,11):
+                    log_buffer[i] = "-"
+            for i, bit in enumerate(status_bits):
+                if i <= 2:
+                
+                    on_text = "V0"+str(i+1)+" :CW"
+                    off_text = "V0"+str(i+1)+" :CCW"
+                elif i < 6:
+                    on_text = "B"+str(i-2)+" :HIGH"
+                    off_text = "B"+str(i-2)+" :LOW"
+                elif i < 8:
+                    on_text = "V0"+str(i-2)+" :CW"
+                    off_text = "V0"+str(i-2)+" :CCW"
+                else:
+                    on_text = "V0"+str(i-2)+" :ON"
+                    off_text = "V0"+str(i-2)+" :OFF"
+                if bit == '1':
+                    self.indicators[i].config(text=on_text)
+                elif bit == '0':
+                    self.indicators[i].config(text=off_text)
+                indicator_text = self.indicators[i].cget("text")
+                parts = indicator_text.split(":")
+                desired_text = parts[1].strip()
+                log_buffer[i+1] = desired_text
+    
+    
+        def send_string(self, command, entry):
+            digits = entry.get()
+            string_to_send = f"{command}{digits}\n"
+            controller.arduino_serial_port.write(string_to_send.encode())
 
-    def on_closing():
+        def log_data(self, oxygen_value):
+            # Log the data to a file
+            today = datetime.date.today()
+            global sonde_log_entry
+            date_str = today.strftime('%Y-%b-%d')
+            log_file_name = f"/home/cee/Dropbox/MABR_data/{date_str}.csv"
+            new_day = False
+           
+            if not os.path.exists(log_file_name):
+                new_day = True
+            with open(log_file_name, 'a') as log_file:
+                if new_day:
+                    # If the log file is new, write an initial log message
+                    initial_log_message = "Timestamp,O\u2082(%),V01,V02,V03,B1,B2,B3,V04,V05,V06,V07,pH,ORP (mV),NO\u2084 (mg/L),NO\u2083 (mg/L),ODO(mg/L),Pressure  (psi),Temp(C),Cond(uS/cm),Flow (gpm),Flow Temp (C)\n"
+                    print(initial_log_message)
+                    log_file.write(f"{initial_log_message}\n")
+                global log_buffer
+                uid = int(os.environ.get('SUDO_UID'))
+                gid = int(os.environ.get('SUDO_GID'))
+                os.chown(log_file_name,uid,gid)
+                log_file.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')}, {','.join(log_buffer)}\n")
+        def update_arduino_fields(self, arduino_data):
+            arduino_data = arduino_data.strip()  # Remove any whitespace or newline characters
+            global startup
+            if arduino_data.startswith('#') and startup:
+                startup=False
+                hex_values = re.findall('[0-9A-Fa-f]{4}', arduino_data[11:])  # Extract 4-digit hex values
+        
+                for i in range(len(hex_values)):
+                    row = i // 2
+                    col = i % 2
+                    if row < len(self.entries) and col < len(self.entries[row]):
+                        entry_widget = self.entries[row][col]
+                        entry_widget.delete(0, tk.END)
+                        decimal_value = int(hex_values[i], 16)
+                        current_value = entry_widget.get()
+                        if current_value != str(decimal_value):
+                            entry_widget.delete(0, tk.END)
+                            entry_widget.insert(0, decimal_value)
+            if arduino_data.startswith('#'):
+                startup=False
+                hex_values = re.findall('[0-9A-Fa-f]{4}', arduino_data[11:])  # Extract 4-digit hex values
+                pressure = (int(hex_values[8],16)/1024)*config['press_sensor_cal']['slope']+config['press_sensor_cal']['y_intercept']
+                flow = (int(hex_values[9],16)/1024*5)*config['flow_sensor_cal']['slope']+config['flow_sensor_cal']['y_intercept']
+                flow_temp = (int(hex_values[10],16)/1024*5)*config['flow_temp_sensor_cal']['slope']+config['flow_temp_sensor_cal']['y_intercept']
+                log_buffer[16]=str(round(pressure,2))
+                log_buffer[19]=str(round(flow,2))
+                log_buffer[20]=str(round(flow_temp,2))
+                self.opc_pressure.set_value(round(pressure,2))
+                try:
+                    self.spare1_dis.update_value(str(round(pressure,2))+ " (" + str(round(int(hex_values[8],16)/1024,2)) + " V)")
+                    self.flow_display.update_value(str(round(flow,2))+ " (" + str(round(int(hex_values[9],16)/1024*5,2)) + " V)")
+                    self.flow_temp_display.update_value(str(round(flow_temp,2))+ " (" + str(round(int(hex_values[10],16)/1024*5,2)) + " V)")
+                    for i in range(len(hex_values)):
+                        row = i // 2
+                        col = i % 2
+                        if row < len(self.entries) and col < len(self.entries[row]):
+                            entry_widget = self.entries[row][col]
+                            decimal_value = int(hex_values[i], 16)
+                            current_value = entry_widget.get()
+                            if current_value != str(decimal_value):
+                                # Set the background color to red if the hex value doesn't match
+                                entry_widget.config(bg="red")
+                            else:
+                                # Set the background color to green if the hex value matches
+                                entry_widget.config(bg="green")
+                except:
+                    pass
+
+    time.sleep(2)
+    if __name__ == "__main__":
+        app = App()
+        app.protocol("WM_DELETE_WINDOW", on_closing)
         try:
-            controller.arduino_serial_port.close()
-        except:
-            pass
-        app.destroy()
+            app.mainloop()
+        finally:
+            app.server.stop()
 
     if __name__ == "__main__":
         app = App()
