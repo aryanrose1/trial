@@ -176,9 +176,10 @@ try:
             return serial_data
 
     class ParameterDisplay(tk.Frame):
-        def __init__(self, parent, name, row, col):
+        def __init__(self, parent, parameter_name, row, col):
             super().__init__(parent)
             self.value = tk.StringVar()
+            self.parameter_name = parameter_name
 
             self.label = tk.Label(self, text=f"{self.parameter_name}", font=("Arial", scale_size))
             self.label.grid(row=row, column=column)
