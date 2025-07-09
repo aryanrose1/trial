@@ -96,7 +96,7 @@ try:
                 parity="N",
                 stopbits=1,
                 timeout=.2,
-                method='rtu
+                method='rtu'
             )
 
 
