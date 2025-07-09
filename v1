@@ -219,30 +219,117 @@ try:
             self.grid_columnconfigure(5, weight=0)  # Add this line
             self.status_label = tk.Label(self, text="Status: Initializing...", font=("Arial", 14))
             self.status_label.grid(row=0, column=0, columnspan=6, sticky="w")
+            # PH
+            self.ph_display = ParameterDisplay(self, "pH:", 3, 0)
+            self.ph_display.grid(row=button_start+3, column=2)
 
-            self.ph_display = ParameterDisplay(self, "pH:", 1, 0)
-            self.orp_display = ParameterDisplay(self, "ORP (mV):", 2, 0)
-            self.orp_valve_display = ParameterDisplay(self, "ORP Valve:", 2, 2)
+            # ORP
+            self.orp_display = ParameterDisplay(self, "ORP (mV):", 5, 0)
+            self.orp_display.grid(row=button_start+5, column=2)
 
-            self.no3_display = ParameterDisplay(self, "NO\u2083 (mg/L):", 3, 0)
+            self.orp_valve_display = ParameterDisplay(self, "ORP Valve:", 2, 2) # This line is meant to substitue aeration valve toggle
+            
+            # Nitrate
+            self.no3_display = ParameterDisplay(self, "NO\u2083 (mg/L):", 1, 0)
+            self.no3_display.grid(row=button_start+1, column=2)
+
+            # Ammonia
             self.no4_display = ParameterDisplay(self, "NH\u2084 (mg/L):", 4, 0)
-            self.DO_display = ParameterDisplay(self, "ODO(mg/L):", 5, 0)
+            self.no4_display.grid(row=button_start+4, column=2)
+
+            # DO
+            self.DO_display = ParameterDisplay(self, "ODO(mg/L):", 2, 0)
+            self.DO_display.grid(row=button_start+2, column=2)
+
+            # Temperature
             self.spare2 = ParameterDisplay(self, "Temp (C):", 0, 0)
-            self.spare1_dis = ParameterDisplay(self, "Press (psi):", 7, 0)
-            self.oxygen_display = ParameterDisplay(self, "O\u2082:", 8, 0)
-            self.flow_display = ParameterDisplay(self, "Flow (gpm):", 9, 0)
+            self.spare2.grid(row=button_start, column=2) 
 
-            self.orp_setpoint_entry = tk.Entry(self, font=("Arial", scale_size), width=8)
-            self.orp_setpoint_entry.grid(row=2, column=4)
-            self.orp_setpoint_entry.insert(0, config.get("orp_setpoint", 650.0))
-            self.orp_setpoint_button = tk.Button(self, text="Set ORP", command=self.send_orp_setpoint)
-            self.orp_setpoint_button.grid(row=2, column=5)
+            # Pressure
+            self.spare1_dis = ParameterDisplay(self, "Press (psi):", 6, 0)
+            self.spare1_dis.grid(row=button_start+6, column=2)
 
-            # Rest of your valve and toggle setup...
-            # SAME as before, unchanged
+            # Oxygen
+            self.oxygen_display = ParameterDisplay(self, "O\u2082:", 7, 0)
+            self.oxygen_display.grid(row=button_start+7, column=2)
+
+            # Flowrate
+            self.flow_display = ParameterDisplay(self, "Flow (gpm):", 8, 0)
+            self.flow_display.grid(row=button_start+8, column=2)
+
+            # Flowrate Temperature
+            self.flow_temp_display = ParameterDisplay(self, "Flow (gpm):", 9, 0)
+            self.flow_temp_display.grid(row=button_start+9, column=2)
+
+            self.server.start()
+            self.indicators = []
+
+            try:
+                for i in range(11):
+                    indicator = tk.Label(self,font=("Arial", scale_size*2))
+                    indicator.grid(row=i+1, column=3,sticky="w")
+                    self.indicators.append(indicator)
+            except:
+                print("Error in creating indicators")
+
+            self.logging_period_label = tk.Label(self, text="Logging Period (s):", font=("Arial", scale_size))
+            self.logging_period_label.grid(row=1, column=0,sticky="e")
+
+            self.logging_period_entry = tk.Entry(self, font=("Arial", scale_size),width=4)
+            self.logging_period_entry.grid(row=1, column=1 )
+            self.logging_period_entry.insert(0, config['logging_period'])  # Default logging period of 1 second
+
+            self.last_logged_time = time.time()
+            
+            # Lines of code for implementing ORP Setpoint Toggle/Value
+            # self.orp_setpoint_entry = tk.Entry(self, font=("Arial", scale_size), width=8)
+            # self.orp_setpoint_entry.grid(row=2, column=4)
+            # self.orp_setpoint_entry.insert(0, config.get("orp_setpoint", 650.0))
+            # self.orp_setpoint_button = tk.Button(self, text="Set ORP", command=self.send_orp_setpoint)
+            # self.orp_setpoint_button.grid(row=2, column=5)
+
+            commands = ["U41", "U42", "U51", "U52", "U61", "U62", "U71", "U72"]
+
+            self.entries = [[None for _ in range(2)] for _ in range(4)]
+            try:
+                for i in range(4):
+                    for j in range(2):
+                        command = commands[i * 2 + j]
+                        valveNumber = i + 4
+                        setpoint = ""
+                        if i < 2 and j == 0:
+                            setpoint = " CW"
+                        elif i < 2 and j == 1:
+                            setpoint = " CCW"
+                        elif j == 0:
+                            setpoint = " ON"
+                        elif j == 1:
+                            setpoint = " OFF"
+                        state = f"V0" + str(valveNumber) + setpoint
+                        entry_label = tk.Label(self, text= state+" (s)", font=("Arial", scale_size))
+                        entry_label.grid(row=i*2 +j +button_start , column=0,sticky="e")
+                        entry_widget = tk.Entry(self, font=("Arial", scale_size), width=5)
+                        entry_widget.grid(row=i*2 +j +button_start, column=1)
+                        entry_widget.insert(0, i)
+
+                        self.entries[i][j] = entry_widget
+
+                        send_button = tk.Button(self, text=f"Update", font=("Arial", scale_size),
+                                                command=partial(self.send_string, command, entry_widget))
+                        send_button.grid(row=i*2 +j +button_start, column=2,sticky="w")
+            except:
+                print("Error in creating entries")
+            try:
+                for i in range(4):
+                    send_button = tk.Button(self, text=f"Toggle", font=("Arial", scale_size),
+                                                command=partial(self.send_string, "U" + str(i+4)+"3",entry_widget))
+                    send_button.grid(row=i +7, column=4,sticky="w")
+            except:
+                print("Error in creating toggle buttons")
 
             self.update_values()
 
+        # Code for implementing ORP setpoint control value setter
         def send_orp_setpoint(self):
             value = self.orp_setpoint_entry.get()
             try:
@@ -252,6 +339,8 @@ try:
                 write_config_file(config_file_path, config)
             except:
                 pass
+
+# Lines below need to be checked
 
         def update_values(self):
             # SAME as before, plus:
