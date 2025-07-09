@@ -332,19 +332,93 @@ try:
 
         def update_status(self, status_text):
             self.status_label.config(text=f"Status: {status_text}")
-
-        # Code for implementing ORP setpoint control value setter
-        def send_orp_setpoint(self):
-            value = self.orp_setpoint_entry.get()
+        def close_app(self):
             try:
-                float(value)
-                controller.arduino_serial_port.write(f"SPORP{value}\n".encode())
-                config['orp_setpoint'] = float(value)
-                write_config_file(config_file_path, config)
+                self.server.stop()
+                controller.arduino_serial_port.close()
             except:
                 pass
+            self.destroy()
 
-# Lines below need to be checked
+        # Code for implementing ORP setpoint control value setter
+        # def send_orp_setpoint(self):
+            # value = self.orp_setpoint_entry.get()
+            # try:
+                # float(value)
+                # controller.arduino_serial_port.write(f"SPORP{value}\n".encode())
+                # config['orp_setpoint'] = float(value)
+                # write_config_file(config_file_path, config)
+            # except:
+                # pass
+
+        def update_values(self):
+            oxygen_value = ""
+            global previous_arduino_log_entry
+            global sonde_log_entry
+            arduino_data=""
+            try:
+                arduino_data = controller.get_value()
+                oxygen_value = o2_sensor.get_value()
+                sonde_data = sonde.get_value()
+                sonde_data = sonde_data.split(" ")
+                #print(sonde_data)
+                sonde_log_entry = ','.join(sonde_data[1:])
+                
+                if sonde_data[0] == "#":
+                    self.ph_display.update_value(sonde_data[pH_idx])
+                    self.orp_display.update_value(sonde_data[orp_idx])
+                    self.no4_display.update_value(sonde_data[NH4_idx])
+                    self.no3_display.update_value(sonde_data[NO3_idx])
+                    self.DO_display.update_value(sonde_data[ODO_idx])
+                    self.spare2.update_value(sonde_data[temp_idx])
+                    log_buffer[11] = sonde_data[pH_idx]
+                    log_buffer[12] = sonde_data[orp_idx]
+                    log_buffer[13] = sonde_data[NH4_idx]
+                    log_buffer[14] = sonde_data[NO3_idx]
+                    log_buffer[15] = sonde_data[ODO_idx]
+                    log_buffer[17] = sonde_data[temp_idx]
+                    log_buffer[18] = sonde_data[cond_idx]
+                self.oxygen_display.update_value(f"{oxygen_value}% ({o2_mA} mA)")
+                log_buffer[0] = str(oxygen_value)
+                self.update_status("Running")
+                if not controller.is_connected()and config["controller_enabled"]:
+                    current_time = datetime.datetime.now()
+                    time_difference = current_time - disconnected_time
+                    seconds_since_event = time_difference.total_seconds()
+                    countdown = config['restart_delay'] - seconds_since_event
+                    status_text = f"Controller is disconnected. Restarting in {countdown:.0f} seconds"
+                    if countdown <= 0:
+                        self.close_app()
+                        return
+                    self.update_status(status_text)
+                if not o2_sensor.is_connected() and config["o2_sensor_enabled"]:
+                    current_time = datetime.datetime.now()
+                    time_difference = current_time - disconnected_time
+                    seconds_since_event = time_difference.total_seconds()
+                    countdown = config['restart_delay'] - seconds_since_event
+                    status_text = f"O2 Sensor is disconnected. Restarting in {countdown:.0f} seconds"
+                    if countdown <= 0:
+                        self.close_app()
+                        return
+                    self.update_status(status_text)
+                self.update_arduino_fields(arduino_data)
+                current_time = time.time()
+                try:
+                    logging_period = float(self.logging_period_entry.get())
+                except ValueError:
+                    logging_period = 1.0
+                global boot_log
+                if boot_log or current_time - self.last_logged_time >= logging_period:
+                    boot_log = False
+                    self.log_data(oxygen_value)
+                    self.last_logged_time = current_time
+                previous_arduino_log_entry = arduino_data
+                self.update_indicators(arduino_data[1:11])
+            except serial.serialutil.SerialException as e:
+                pass
+            except Exception as e:
+                pass
+            self.after(1, self.update_values)
 
         def update_indicators(self, status_bits):
             on_text = ""
