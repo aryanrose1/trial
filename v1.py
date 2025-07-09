@@ -453,21 +453,6 @@ try:
                     pass
 
     time.sleep(2)
-    if __name__ == "__main__":
-        app = App()
-        app.protocol("WM_DELETE_WINDOW", on_closing)
-        try:
-            app.mainloop()
-        finally:
-            app.server.stop()
-
-    if __name__ == "__main__":
-        app = App()
-        app.protocol("WM_DELETE_WINDOW", on_closing)
-        try:
-            app.mainloop()
-        finally:
-            app.server.stop()
 
     def on_closing():
         try:
