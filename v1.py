@@ -176,8 +176,8 @@ try:
             return serial_data
 
     class ParameterDisplay(tk.Frame):
-        def __init__(self, parent, parameter_name, row, col):
-            super().__init__(parent)
+        def __init__(self, parent, parameter_name, row, column, *args, **kwargs):
+            super().__init__(parent, *args, **kwargs)
             self.value = tk.StringVar()
             self.parameter_name = parameter_name
 
