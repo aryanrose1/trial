@@ -164,23 +164,30 @@ try:
             return not self.disconnected
 
         def get_value(self):
+            serial_data = ""
             if not self.disconnected:
                 try:
-                    return self.arduino_serial_port.readline().decode("utf-8").strip()
+                    serial_data = self.arduino_serial_port.readline().decode("utf-8").strip()
                 except:
                     global disconnected_time
                     disconnected_time = datetime.datetime.now()
                     self.disconnected = True
-            return ""
+                    return ""
+            return serial_data
 
     class ParameterDisplay(tk.Frame):
         def __init__(self, parent, name, row, col):
             super().__init__(parent)
             self.value = tk.StringVar()
-            tk.Label(parent, text=f"{name}", font=("Arial", scale_size)).grid(row=row, column=col)
-            tk.Label(parent, textvariable=self.value, font=("Arial", scale_size)).grid(row=row, column=col + 1)
 
-        def update_value(self, v): self.value.set(v)
+            self.label = tk.Label(self, text=f"{self.parameter_name}", font=("Arial", scale_size))
+            self.label.grid(row=row, column=column)
+
+            self.value_label = tk.Label(self, textvariable=self.value, font=("Arial", scale_size))
+            self.value_label.grid(row=row, column=column+1)
+
+        def update_value(self, v): 
+            self.value.set(v)
 
     o2_sensor = O2_sensor(args.O2_port)
     controller = Controller(args.controller_port)
@@ -204,6 +211,12 @@ try:
             self.close_button = tk.Button(self, text="Close", font=("Arial", 14), command=on_closing)
             self.close_button.grid(row=0, column=6, columnspan=6)
 
+            self.grid_columnconfigure(0, weight=1)
+            self.grid_columnconfigure(1, weight=0)
+            self.grid_columnconfigure(2, weight=1)
+            self.grid_columnconfigure(3, weight=0)
+            self.grid_columnconfigure(4, weight=1)  # Add this line
+            self.grid_columnconfigure(5, weight=0)  # Add this line
             self.status_label = tk.Label(self, text="Status: Initializing...", font=("Arial", 14))
             self.status_label.grid(row=0, column=0, columnspan=6, sticky="w")
 
@@ -214,7 +227,7 @@ try:
             self.no3_display = ParameterDisplay(self, "NO\u2083 (mg/L):", 3, 0)
             self.no4_display = ParameterDisplay(self, "NH\u2084 (mg/L):", 4, 0)
             self.DO_display = ParameterDisplay(self, "ODO(mg/L):", 5, 0)
-            self.spare2 = ParameterDisplay(self, "Temp (C):", 6, 0)
+            self.spare2 = ParameterDisplay(self, "Temp (C):", 0, 0)
             self.spare1_dis = ParameterDisplay(self, "Press (psi):", 7, 0)
             self.oxygen_display = ParameterDisplay(self, "O\u2082:", 8, 0)
             self.flow_display = ParameterDisplay(self, "Flow (gpm):", 9, 0)
