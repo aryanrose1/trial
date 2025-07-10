@@ -259,7 +259,7 @@ try:
             self.flow_display.grid(row=button_start+8, column=2)
 
             # Flowrate Temperature
-            self.flow_temp_display = ParameterDisplay(self, "Flow (gpm):", 9, 0)
+            self.flow_temp_display = ParameterDisplay(self, "Flow Temp (C):", 9, 0)
             self.flow_temp_display.grid(row=button_start+9, column=2)
 
             self.server.start()
