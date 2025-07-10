@@ -29,7 +29,6 @@ try:
     boot_log = True
     button_start = 2
     scale_size = 18
-
     parser = argparse.ArgumentParser()
     parser.add_argument("--controller_port", help="controller port", default=None)
     parser.add_argument("--O2_port", help="02 sensor port", default=None)
@@ -37,7 +36,7 @@ try:
     args = parser.parse_args()
     previous_arduino_log_entry = ""
     controller_log_entry = ""
-
+    
     def read_config_file(file_path):
         with open(file_path, 'r') as file:
             config = json.load(file)
@@ -49,7 +48,7 @@ try:
 
     config_file_path = 'config.json'
     config = read_config_file(config_file_path)
-
+    
     def map_value(value, input_min, input_max, output_min, output_max):
         return output_min + (value - input_min) * (output_max - output_min) / (input_max - input_min)
 
@@ -60,7 +59,7 @@ try:
             self.serial_data = ""
             if port is not None:
                 self.disconnected = False
-                self.serial_port = serial.Serial(port=port, baudrate=9600, timeout=1)
+                self.serial_port = serial.Serial(port=port, baudrate=9600, timeout=1)        
                 self.reader_thread = threading.Thread(target=self.read_from_port)
                 self.reader_thread.daemon = True
                 self.reader_thread.start()
@@ -98,29 +97,30 @@ try:
                 timeout=.2,
                 method='rtu'
             )
-
-
             self.oxygen_value = -1.0
             self.reader_thread = threading.Thread(target=self.loop)
             self.reader_thread.daemon = True
             self.reader_thread.start()
-
+        
         def is_connected(self):
             return not self.disconnected
-
+        
         def get_value(self):
             return self.oxygen_value
-
+        
         def loop(self):
             while True:
                 self.get_data()
-
+        
         def get_data(self):
             try:
                 self.client.connect()
                 response = self.client.read_input_registers(7, 1, unit=5)
+                
                 if response.isError():
+                    print(f"Error in reading register: {response}")
                     self.oxygen_value = "ERR"
+                
                 else:
                     ch1 = response.registers[0] * 0.001
                     global o2_mA
@@ -133,25 +133,31 @@ try:
                     percent_1 = self.calibration['percent_1']
                     input_max = self.calibration['input_max']
                     output_max = self.calibration['output_max']
+
                     if ch1 >= current_3:
                         mapped_value = map_value(ch1, current_3, input_max, percent_3, output_max)
+                    
                     elif ch1 >= current_2:
                         mapped_value = map_value(ch1, current_2, current_3, percent_2, percent_3)
+                    
                     else:
                         mapped_value = map_value(ch1, current_1, current_2, percent_1, percent_2)
+                        
                     if ch1 > current_3:
                         slope = (percent_3 - percent_2) / (current_3 - current_2)
                         intercept = percent_3 - slope * current_3
                         mapped_value = slope * ch1 + intercept
-
+                    
                     self.oxygen_value = f"{mapped_value:.2f}"
                     self.client.close()
-
+                    
             except:
+                print("Error in reading register")
                 self.oxygen_value = "ERR"
                 self.disconnected = True
                 self.client.close()
 
+    
     class Controller:
         def __init__(self, port):
             self.port = port
@@ -159,10 +165,10 @@ try:
             if port is not None:
                 self.disconnected = False
                 self.arduino_serial_port = serial.Serial(port=args.controller_port, baudrate=115200, timeout=.1)
-
+                
         def is_connected(self):
             return not self.disconnected
-
+            
         def get_value(self):
             serial_data = ""
             if not self.disconnected:
@@ -173,6 +179,7 @@ try:
                     disconnected_time = datetime.datetime.now()
                     self.disconnected = True
                     return ""
+     
             return serial_data
 
     class ParameterDisplay(tk.Frame):
@@ -208,10 +215,8 @@ try:
             self.opc_pressure.set_writable()
             self.attributes("-fullscreen", True)
             self.geometry("{0}x{1}+0+0".format(self.winfo_screenwidth(), self.winfo_screenheight()))
-
             self.close_button = tk.Button(self, text="Close", font=("Arial", 14), command=on_closing)
             self.close_button.grid(row=0, column=6, columnspan=6)
-
             self.grid_columnconfigure(0, weight=1)
             self.grid_columnconfigure(1, weight=0)
             self.grid_columnconfigure(2, weight=1)
@@ -220,10 +225,10 @@ try:
             self.grid_columnconfigure(5, weight=0)  # Add this line
             self.status_label = tk.Label(self, text="Status: Initializing...", font=("Arial", 14))
             self.status_label.grid(row=0, column=0, columnspan=6, sticky="w")
+            
             # PH
             self.ph_display = ParameterDisplay(self, "pH:", 3, 0)
             self.ph_display.grid(row=button_start+3, column=2)
-
             # ORP
             self.orp_display = ParameterDisplay(self, "ORP (mV):", 5, 0)
             self.orp_display.grid(row=button_start+5, column=2)
