@@ -352,6 +352,46 @@ try:
                     log_buffer[15] = sonde_data[ODO_idx]
                     log_buffer[17] = sonde_data[temp_idx]
                     log_buffer[18] = sonde_data[cond_idx]
+                    # ---------------------------------------------------------------
+                    # ORP-based aeration supervisor  (MUST be indented same as code above)
+                    # ---------------------------------------------------------------
+                    try:
+                        orp_mV = float(sonde_data[orp_idx])       # ← grabs the ORP we just displayed
+                        now    = time.time()
+                        # create the timers the first time we run
+                        if not hasattr(self, "last_scour"):        # attribute lives on the App instance
+                            self.last_scour     = 0
+                            self.high_orp_start = now
+                
+                        # ---------- mixing-air duty (V-01 / Valve 6) ---------------
+                        if orp_mV < -225:                          # deep anaerobic
+                            controller.arduino_serial_port.write(b"U61 20\nU62 40\n")
+                        elif orp_mV < -25:                         # sweet anoxic band
+                            controller.arduino_serial_port.write(b"U61 10\nU62 50\n")
+                        elif orp_mV > +25:                         # trending aerobic
+                            controller.arduino_serial_port.write(b"U61 0\nU62 60\n")
+                
+                        # ---------- regular scouring every 15 min ------------------
+                        if now - self.last_scour >= 15*60:
+                            controller.arduino_serial_port.write(b"U73\n")     # toggle ON
+                            self.after(30_000,                                  # schedule OFF in 30 s
+                                       lambda: controller.arduino_serial_port.write(b"U73\n"))
+                            self.last_scour = now
+                
+                        # ---------- emergency scour if ORP stuck high -------------
+                        if orp_mV > +175:
+                            if now - self.high_orp_start > 180:
+                                controller.arduino_serial_port.write(b"U73\n")   # toggle ON
+                                self.after(30_000,
+                                           lambda: controller.arduino_serial_port.write(b"U73\n"))
+                                self.high_orp_start = now
+                        else:
+                            self.high_orp_start = now
+                
+                    except (ValueError, IndexError):
+                        # bad or missing ORP reading – ignore this cycle
+                        pass
+                    # ---------------------------------------------------------------
                 self.oxygen_display.update_value(f"{oxygen_value}% ({o2_mA} mA)")
                 log_buffer[0] = str(oxygen_value)
                 self.update_status("Running")
