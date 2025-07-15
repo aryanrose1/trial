@@ -433,10 +433,16 @@ if (stringComplete) {
   else                             three_way_valve4.set(CCW);
   if (valve5_controller.update())  three_way_valve5.set(CW);
   else                             three_way_valve5.set(CCW);
-  if (valve6_controller.update())  valve6.set(ON);
-  else                             valve6.set(OFF);
-   if (valve7_controller.update()) valve7.set(ON);
-  else                             valve7.set(OFF);
+  /* ---------- MUTUAL-EXCLUSION FOR MIXING & SCOURING ------------ */
+  bool scour_on = valve7_controller.update();   // state-1 = ON, state-2 = OFF
+  bool mix_on   = valve6_controller.update();   // state-1 = ON, state-2 = OFF
+
+  if (scour_on) mix_on = false;                 // ***key line: scouring wins***
+
+  valve6.set( mix_on  ? ON  : OFF );
+  valve7.set( scour_on? ON  : OFF );
+/* -------------------------------------------------------------- */
+
 
   three_way_valve1.printLCD(0, 0);
   three_way_valve2.printLCD(0, 1);
