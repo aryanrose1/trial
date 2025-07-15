@@ -461,7 +461,7 @@ valve7.printLCD(6, 2);
     three_way_valve3.get_pos(),
     three_way_valve4.get_pos(),
     three_way_valve5.get_pos(),
-     mix_on, scour_on,    // changed to reflect new variables
+      mix_on, scour_on,    // changed to reflect new variables
     barrel1.is_full(),
     barrel2.is_full(),
     barrel3.is_full(),
