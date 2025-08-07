@@ -364,15 +364,15 @@ void serialStatus(bool tw1, bool tw2, bool tw3, bool tw4, bool tw5,
   ThreeWayValve three_way_valve1 = ThreeWayValve(1,CCW,2,3,new Timer());
   ThreeWayValve three_way_valve2 = ThreeWayValve(2,CCW,4,5,new Timer());
   ThreeWayValve three_way_valve3 = ThreeWayValve(3,CCW,7,6,new Timer());
-  ThreeWayValve three_way_valve4 = ThreeWayValve(4,CCW,8,9);
+  ThreeWayValve mixing_valve = ThreeWayValve(4,CCW,8,9);
   ThreeWayValve three_way_valve5 = ThreeWayValve(5,CCW,11,12);
-  Valve valve6 = Valve(6,OFF,10);
+  // Valve valve6 = Valve(6,OFF,10);
   Valve valve7 = Valve(7,OFF,13);
  
   Barrel barrel1 = Barrel(1,24,false,new Timer());
   Barrel barrel2 = Barrel(2,23,false, new Timer()); //to flip level logic, change 3rd argument from true to false, currently for float sensor
   Barrel barrel3 = Barrel(3,22,false, new Timer()); //All three sensors are float sensors
-  Bistable valve4_controller = Bistable(5,5,true,0,4);
+  Bistable valve4_controller = Bistable(5,5,true,0,4); // drives mixing air valve
   Bistable valve5_controller = Bistable(5,5,true,8,12);
   Bistable valve6_controller = Bistable(5,5,true,16,20);
   Bistable valve7_controller = Bistable(5,5,true,24,28);
@@ -435,11 +435,11 @@ if (stringComplete) {
   else                             three_way_valve5.set(CCW);
   /* ---------- MUTUAL-EXCLUSION FOR MIXING & SCOURING ------------ */
   bool scour_on = valve7_controller.update();   // state-1 = ON, state-2 = OFF
-  bool mix_on   = valve6_controller.update();   // state-1 = ON, state-2 = OFF
+  bool mix_on   = valve4_controller.update();   // state-1 = ON, state-2 = OFF
 
   if (scour_on) mix_on = false;                 // ***key line: scouring wins***
 
-  valve6.set( mix_on  ? ON  : OFF );
+  mixing_valve.set( mix_on  ? CW : CCW );
   valve7.set( scour_on? ON  : OFF );
 /* -------------------------------------------------------------- */
 
@@ -459,16 +459,22 @@ valve7.printLCD(6, 2);
     three_way_valve1.get_pos(),
     three_way_valve2.get_pos(),
     three_way_valve3.get_pos(),
-    three_way_valve4.get_pos(),
+	mix_on
+    // three_way_valve4.get_pos(),
     three_way_valve5.get_pos(),
-      mix_on, scour_on,    // changed to reflect new variables
+    0, 
+	scour_on,    // changed to reflect new variables
     barrel1.is_full(),
     barrel2.is_full(),
     barrel3.is_full(),
-    valve4_controller.state_1_len, valve4_controller.state_2_len,
-    valve5_controller.state_1_len, valve5_controller.state_2_len,
-    valve6_controller.state_1_len, valve6_controller.state_2_len,
-    valve7_controller.state_1_len, valve7_controller.state_2_len
+    valve4_controller.state_1_len, 
+	valve4_controller.state_2_len,
+    valve5_controller.state_1_len, 
+	valve5_controller.state_2_len,
+	0, 0,
+    // valve6_controller.state_1_len, valve6_controller.state_2_len,
+    valve7_controller.state_1_len,
+	valve7_controller.state_2_len
   );
  
 
