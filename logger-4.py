@@ -60,7 +60,8 @@ try:
             self.serial_data = ""
             if port is not None:
                 self.disconnected = False
-                self.serial_port = serial.Serial(port=port, baudrate=9600, timeout=1) 
+                # self.serial_port = serial.Serial(port=port, baudrate=9600, timeout=1) 
+                self.serial_port = serial.serial_for_url(port, baudrate=9600, timeout=1)
                 #self.serial_port.write("run \r".encode())
                 self.reader_thread = threading.Thread(target=self.read_from_port)
                 self.reader_thread.daemon = True  # Ensure thread closes when main program closes
@@ -88,17 +89,20 @@ try:
             self.calibration = config['O2_sensor_calibration']
             self.port = port
             self.disconnected = True
-            if port is not None:
+            if port and not port.startswith("loop://"):
+                self.client = ModbuserialClient(
+                    method="rtu",
+                    port=args.O2_port,  # Replace with your COM port
+                    baudrate=9600,
+                    bytesize=8,
+                    parity="N",
+                    stopbits=1,
+                    timeout=.2   
+                )        
+            else:
+                self.client = None
                 self.disconnected = False
-                self.client = ModbusSerialClient(
-            method="rtu",
-            port=args.O2_port,  # Replace with your COM port
-            baudrate=9600,
-            bytesize=8,
-            parity="N",
-            stopbits=1,
-            timeout=.2
-        )
+                
             self.oxygen_value = -1.0
             self.reader_thread = threading.Thread(target=self.loop)
             self.reader_thread.daemon = True  # Ensure thread closes when main program closes
@@ -111,6 +115,9 @@ try:
             while True:
                 self.get_data()
         def get_data(self):
+            if not self.client:             # running in test mode (loop://)
+                self.oxygen_value = "-"     # or any placeholder you like
+                return
             try:
                 self.client.connect()
                 slave_address = 5
@@ -164,7 +171,8 @@ try:
             self.disconnected = True
             if port is not None:
                 self.disconnected = False
-                self.arduino_serial_port = serial.Serial(port=args.controller_port, baudrate=115200, timeout=.1)
+                # self.arduino_serial_port = serial.Serial(port=args.controller_port, baudrate=115200, timeout=.1)
+                self.arduino_serial_port = serial.serial_for_url(port, baudrate=115200, timeout=.1)
         def is_connected(self):
             return not self.disconnected
         def get_value(self):
@@ -484,6 +492,14 @@ try:
 
         # The rest of your existing App class code goes here
         def update_indicators(self, status_bits):
+            labels = [
+                ("V01 :CW","V01 :CCW"), ("V02 :CW","V02 :CCW"),
+                ("V03 :CW","V03 :CCW"),
+                ("V04 :ON","V04 :OFF"),  # mixing
+                ("V05 :CW","V05 :CCW"),
+                ("B1 :HIGH","B1 :LOW"),  ("B2 :HIGH","B2 :LOW"), ("B3 :HIGH","B3 :LOW"),
+                ("V07 :ON","V07 :OFF")   # scour
+            ]
             on_text = ""
             off_text = ""
             global controller_log_entry
@@ -492,24 +508,28 @@ try:
             if controller.disconnected:
                  for i in range(1,11):
                     log_buffer[i] = "-"
+            # --- update_indicators() ---
             for i, bit in enumerate(status_bits):
-                if i <= 2:
-                
-                    on_text = "V0"+str(i+1)+" :CW"
-                    off_text = "V0"+str(i+1)+" :CCW"
-                elif i < 6:
-                    on_text = "B"+str(i-2)+" :HIGH"
-                    off_text = "B"+str(i-2)+" :LOW"
-                elif i < 8:
-                    on_text = "V0"+str(i-2)+" :CW"
-                    off_text = "V0"+str(i-2)+" :CCW"
-                else:
-                    on_text = "V0"+str(i-2)+" :ON"
-                    off_text = "V0"+str(i-2)+" :OFF"
-                if bit == '1':
-                    self.indicators[i].config(text=on_text)
-                elif bit == '0':
-                    self.indicators[i].config(text=off_text)
+                on, off = labels[i]
+                self.indicators[i].config(text = on if bit=='1' else off)
+                log_buffer[i+1] = on.split(':')[1] if bit=='1' else off.split(':')[1]
+            # for i, bit in enumerate(status_bits):
+            #     if i <= 2:
+            #         on_text = "V0"+str(i+1)+" :CW"
+            #         off_text = "V0"+str(i+1)+" :CCW"
+            #     elif i < 6:
+            #         on_text = "B"+str(i-2)+" :HIGH"
+            #         off_text = "B"+str(i-2)+" :LOW"
+            #     elif i < 8:
+            #         on_text = "V0"+str(i-2)+" :CW"
+            #         off_text = "V0"+str(i-2)+" :CCW"
+            #     else:
+            #         on_text = "V0"+str(i-2)+" :ON"
+            #         off_text = "V0"+str(i-2)+" :OFF"
+            #     if bit == '1':
+            #         self.indicators[i].config(text=on_text)
+            #     elif bit == '0':
+            #         self.indicators[i].config(text=off_text)
                 indicator_text = self.indicators[i].cget("text")
                 parts = indicator_text.split(":")
                 desired_text = parts[1].strip()
@@ -518,8 +538,11 @@ try:
     
         def send_string(self, command, entry):
             digits = entry.get()
-            string_to_send = f"{command}{digits}\n"
+            string_to_send = f"{command} {digits}\n"
             controller.arduino_serial_port.write(string_to_send.encode())
+            # digits = entry.get()
+            # string_to_send = f"{command}{digits}\n"
+            # controller.arduino_serial_port.write(string_to_send.encode())
 
         def log_data(self, oxygen_value):
             # Log the data to a file
