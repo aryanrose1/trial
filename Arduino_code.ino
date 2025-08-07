@@ -10,34 +10,30 @@
 #define PRESSURE_PIN A9
 #define FLOW_PIN A1
 #define TEMP_PIN A2
-String inputString = "";         // a String to hold incoming data
+
+String inputString;         // a String to hold incoming data
 bool stringComplete = false;
 
-
-
-void printHex(int num, int precision)
+void printHex(uint16_t num, uint8_t digits = 4)
 {
-  char tmp[16];
-  char format[128];
-  sprintf(format, "%%.%dX", precision);
-  sprintf(tmp, format, num);
-  Serial.print(tmp);
+  char fmt[6];
+  sprintf(fmt, "%%0%dX", digits);
+  char buf[8];
+  sprintf(buf, fmt, num);
+  Serial.print(buf);
 }
 
-void EEPROMWritelong(int address, long value)
+void EEPROMWritelong(int addr, long value)
 {
-	//Decomposition from a long to 4 bytes by using bitshift.
-	//One = Most significant -> Four = Least significant byte
-	byte four = (value & 0xFF);
-	byte three = ((value >> 8) & 0xFF);
-	byte two = ((value >> 16) & 0xFF);
-	byte one = ((value >> 24) & 0xFF);
+  for (uint8_t i = 0; i < 4; ++i)
+    EEPROM.write(addr + i, (value >> (i * 8)) & 0xFF);
+}
 
-
-	EEPROM.write(address, four);
-	EEPROM.write(address + 1, three);
-	EEPROM.write(address + 2, two);
-	EEPROM.write(address + 3, one);
+long EEPROMReadlong(int addr)
+{
+  long val = 0;
+  for (int8_t i = 3; i >= 0; --i) val = (val << 8) | EEPROM.read(addr + i);
+  return val;
 }
 
 class Timer
@@ -67,17 +63,6 @@ class Timer
   }
 };
 
-long EEPROMReadlong(long address)
-{
-	//Read the 4 bytes from the eeprom memory.
-	long four = EEPROM.read(address);
-	long three = EEPROM.read(address + 1);
-	long two = EEPROM.read(address + 2);
-	long one = EEPROM.read(address + 3);
-
-	//Return the recomposed long by using bitshift.
-	return ((four << 0) & 0xFF) + ((three << 8) & 0xFFFF) + ((two << 16) & 0xFFFFFF) + ((one << 24) & 0xFFFFFFFF);
-}
 // Set the LCD address to 0x27 for a 16 chars and 2 line display
 LiquidCrystal_I2C lcd(0x27, 20, 4);
 enum POSITION
@@ -162,7 +147,7 @@ int ccw_pin, cw_pin;
 int id;
 Timer *timer;
 public:
-set(POSITION pos)
+	void set(POSITION pos)
 {
   position = pos;
   digitalWrite(ccw_pin, pos);
@@ -197,7 +182,7 @@ bool get_pos()
 {
   return position;
 }
-printLCD(int col, int row )
+void printLCD(int col, int row )
 {
   lcd.setCursor(col, row);
   lcd.print(id);
@@ -238,7 +223,7 @@ POSITION position;
 int pin;
 int id;
 public:
-set(POSITION pos)
+void set(POSITION pos)
 {
   position = pos;
   digitalWrite(pin, pos);
@@ -263,7 +248,7 @@ bool get_pos()
 {
   return position;
 }
-printLCD(int col, int row )
+void printLCD(int col, int row )
 {
   lcd.setCursor(col, row);
   lcd.print(id);
@@ -292,8 +277,8 @@ Barrel(int id,int pin,bool active_low = false,Timer * timer = nullptr)
   timer->start(MAX_STATE);
   this->id = id;
   this->pin = pin;
-  this-> min_low = min_low;
-  this-> min_high = min_high;
+  // this-> min_low = min_low;
+  // this-> min_high = min_high;
   this->active_low =  active_low;
   this->filled = is_full();
   pinMode(pin, INPUT_PULLUP);
@@ -328,39 +313,31 @@ void printLCD(int col, int row)
   else lcd.print("VOID"); 
 }
 };
-void serialStatus(bool tw1, bool tw2, bool tw3, bool tw4, bool tw5,
-                  bool v6, bool v7, 
-                  bool b1, bool b2, bool b3, 
-                  long v4_1, long v4_2,
-                  long v5_1, long v5_2,
-                  long v6_1, long v6_2,
-                  long v7_1,long v7_2)
-{
-  Serial.print("#");
-  Serial.print(tw1);
-  Serial.print(tw2);
-  Serial.print(tw3);
-  Serial.print(b1);
-  Serial.print(b2);
-  Serial.print(b3);
-  Serial.print(tw4);
-  Serial.print(tw5);
-  Serial.print(v6);
-  Serial.print(v7);
-  printHex(v4_1,4);
-  printHex(v4_2,4);
-  printHex(v5_1,4);
-  printHex(v5_2,4);
-  printHex(v6_1,4);
-  printHex(v6_2,4);
-  printHex(v7_1,4);
-  printHex(v7_2,4);
-  printHex(analogRead(PRESSURE_PIN),4);
-  printHex(analogRead(FLOW_PIN),4);
-  printHex(analogRead(TEMP_PIN),4);
-  Serial.print("!\r\n");
-};
-
+	void serialStatus(bool tw1, bool tw2, bool tw3,     // V01-V03
+	                  bool v4,  bool v5,                // V04-V05
+	                  bool b1,  bool b2,  bool b3,      // B1-B3
+	                  bool v7,                          // V07
+	                  long v4_1, long v4_2,
+	                  long v5_1, long v5_2,
+	                  long v6_1, long v6_2,             // dummy V06 words
+	                  long v7_1, long v7_2)
+	{
+	  Serial.print('#');
+	  Serial.print(tw1); Serial.print(tw2); Serial.print(tw3);
+	  Serial.print(v4 ); Serial.print(v5 );
+	  Serial.print(b1 ); Serial.print(b2 ); Serial.print(b3 );
+	  Serial.print(v7 );
+	
+	  printHex(v4_1); printHex(v4_2);
+	  printHex(v5_1); printHex(v5_2);
+	  printHex(v6_1); printHex(v6_2);         // keeps payload length
+	  printHex(v7_1); printHex(v7_2);
+	
+	  printHex(analogRead(PRESSURE_PIN));
+	  printHex(analogRead(FLOW_PIN));
+	  printHex(analogRead(TEMP_PIN));
+	  Serial.println('!');
+	}
   ThreeWayValve three_way_valve1 = ThreeWayValve(1,CCW,2,3,new Timer());
   ThreeWayValve three_way_valve2 = ThreeWayValve(2,CCW,4,5,new Timer());
   ThreeWayValve three_way_valve3 = ThreeWayValve(3,CCW,7,6,new Timer());
@@ -374,7 +351,7 @@ void serialStatus(bool tw1, bool tw2, bool tw3, bool tw4, bool tw5,
   Barrel barrel3 = Barrel(3,22,false, new Timer()); //All three sensors are float sensors
   Bistable valve4_controller = Bistable(5,5,true,0,4); // drives mixing air valve
   Bistable valve5_controller = Bistable(5,5,true,8,12);
-  Bistable valve6_controller = Bistable(5,5,true,16,20);
+  // Bistable valve6_controller = Bistable(5,5,true,16,20);
   Bistable valve7_controller = Bistable(5,5,true,24,28);
   
   
@@ -406,14 +383,14 @@ if (stringComplete) {
     {
       if (inputString[1] =='4' && inputString[2] == '3') valve4_controller.toggle();
       if (inputString[1] =='5' && inputString[2] == '3') valve5_controller.toggle();
-      if (inputString[1] =='6' && inputString[2] == '3') valve6_controller.toggle();
+      // if (inputString[1] =='6' && inputString[2] == '3') valve6_controller.toggle();
       if (inputString[1] =='7' && inputString[2] == '3') valve7_controller.toggle();
       if (inputString[1] =='4' && inputString[2] == '1')valve4_controller.set_length(true,atol(inputString.substring(3).c_str()));
       if (inputString[1] =='4' && inputString[2] == '2')valve4_controller.set_length(false,atol(inputString.substring(3).c_str()));
       if (inputString[1] =='5' && inputString[2] == '1')valve5_controller.set_length(true,atol(inputString.substring(3).c_str()));
       if (inputString[1] =='5' && inputString[2] == '2')valve5_controller.set_length(false,atol(inputString.substring(3).c_str()));
-      if (inputString[1] =='6' && inputString[2] == '1')valve6_controller.set_length(true,atol(inputString.substring(3).c_str()));
-      if (inputString[1] =='6' && inputString[2] == '2')valve6_controller.set_length(false,atol(inputString.substring(3).c_str()));
+      // if (inputString[1] =='6' && inputString[2] == '1')valve6_controller.set_length(true,atol(inputString.substring(3).c_str()));
+      // if (inputString[1] =='6' && inputString[2] == '2')valve6_controller.set_length(false,atol(inputString.substring(3).c_str()));
       if (inputString[1] =='7' && inputString[2] == '1')valve7_controller.set_length(true,atol(inputString.substring(3).c_str()));
       if (inputString[1] =='7' && inputString[2] == '2')valve7_controller.set_length(false,atol(inputString.substring(3).c_str()));
     }
@@ -429,8 +406,9 @@ if (stringComplete) {
   else                             three_way_valve2.update(CW,TANK_2_LOW);  
   if (barrel3.is_full())           three_way_valve3.update(CCW,SPARGE_DELAY);
   else                             three_way_valve3.update(CW,SPARGE_DELAY);
-  if (valve4_controller.update())  three_way_valve4.set(CW);
-  else                             three_way_valve4.set(CCW);
+  if (valve4_controller.update())  mixing_valve.set(CW);
+  else                             mixing_valve.set(CCW);
+  mixing_valve.printLCD(0,3);
   if (valve5_controller.update())  three_way_valve5.set(CW);
   else                             three_way_valve5.set(CCW);
   /* ---------- MUTUAL-EXCLUSION FOR MIXING & SCOURING ------------ */
@@ -447,34 +425,23 @@ if (stringComplete) {
   three_way_valve1.printLCD(0, 0);
   three_way_valve2.printLCD(0, 1);
   three_way_valve3.printLCD(0, 2);
-three_way_valve4.printLCD(0, 3);
+// three_way_valve4.printLCD(0, 3);
 three_way_valve5.printLCD(6, 0);
-valve6.printLCD(6, 1);
+// valve6.printLCD(6, 1);
 valve7.printLCD(6, 2);
   barrel1.printLCD(12,0);
   barrel2.printLCD(12,1);
   barrel3.printLCD(12,2);
 
   serialStatus(
-    three_way_valve1.get_pos(),
-    three_way_valve2.get_pos(),
-    three_way_valve3.get_pos(),
-	mix_on
-    // three_way_valve4.get_pos(),
-    three_way_valve5.get_pos(),
-    0, 
-	scour_on,    // changed to reflect new variables
-    barrel1.is_full(),
-    barrel2.is_full(),
-    barrel3.is_full(),
-    valve4_controller.state_1_len, 
-	valve4_controller.state_2_len,
-    valve5_controller.state_1_len, 
-	valve5_controller.state_2_len,
+    three_way_valve1.get_pos(), three_way_valve2.get_pos(), three_way_valve3.get_pos(),
+    mix_on,                     three_way_valve5.get_pos(),
+    barrel1.is_full(),          barrel2.is_full(),          barrel3.is_full(),
+    scour_on,
+    valve4_controller.state_1_len, valve4_controller.state_2_len,
+    valve5_controller.state_1_len, valve5_controller.state_2_len,
 	0, 0,
-    // valve6_controller.state_1_len, valve6_controller.state_2_len,
-    valve7_controller.state_1_len,
-	valve7_controller.state_2_len
+    valve7_controller.state_1_len, valve7_controller.state_2_len
   );
  
 
