@@ -363,13 +363,13 @@ try:
                             self.last_scour     = 0
                             self.high_orp_start = now
                 
-                        # ---------- mixing-air duty (V-01 / Valve 6) ---------------
+                        # ---------- mixing-air duty (V-04) ---------------
                         if orp_mV < -225:                          # deep anaerobic
-                            controller.arduino_serial_port.write(b"U61 20\nU62 40\n")
+                            controller.arduino_serial_port.write(b"U41 20\nU42 40\n")
                         elif orp_mV < -25:                         # sweet anoxic band
-                            controller.arduino_serial_port.write(b"U61 10\nU62 50\n")
+                            controller.arduino_serial_port.write(b"U41 10\nU42 50\n")
                         elif orp_mV > +25:                         # trending aerobic
-                            controller.arduino_serial_port.write(b"U61 0\nU62 60\n")
+                            controller.arduino_serial_port.write(b"U41 0\nU42 60\n")
                 
                         # ---------- regular scouring every 15 min ------------------
                         if now - self.last_scour >= 15*60:
