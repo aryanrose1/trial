@@ -90,15 +90,11 @@ try:
             self.port = port
             self.disconnected = True
             if port and not port.startswith("loop://"):
-                self.client = ModbuserialClient(
-                    method="rtu",
-                    port=args.O2_port,  # Replace with your COM port
-                    baudrate=9600,
-                    bytesize=8,
-                    parity="N",
-                    stopbits=1,
-                    timeout=.2   
-                )        
+                self.client = ModbusSerialClient(
+                    method="rtu", port=port,
+                    baudrate=9600, bytesize=8, parity="N",
+                    stopbits=1, timeout=.2
+                )
             else:
                 self.client = None
                 self.disconnected = False
@@ -216,7 +212,12 @@ try:
             self.uri = "http://examples.freeopcua.github.io"
             self.idx = self.server.register_namespace(self.uri)
             self.objects = self.server.get_objects_node()
-
+            self.indicators = []
+            for i in range(9):                              # was 11
+                lbl = tk.Label(self, font=("Arial", scale_size*2))
+                lbl.grid(row=i+1, column=3, sticky="w")
+                self.indicators.append(lbl)
+            
             # populating our address space
             self.opc_data = self.objects.add_object(self.idx, "MABR_DATA")
             self.opc_pressure = self.opc_data.add_variable(self.idx, "pressure", -1.0)
@@ -259,15 +260,6 @@ try:
             self.flow_temp_display = ParameterDisplay(self, "Flow Temp (C):", 8, 0)
             self.flow_temp_display.grid(row=button_start+9, column=2)
             self.server.start()
-            self.indicators = []
-            try:
-                for i in range(11):
-                    indicator = tk.Label(self,font=("Arial", scale_size*2))
-                    indicator.grid(row=i+1, column=3,sticky="w")
-                    self.indicators.append(indicator)
-            except:
-                print("Error in creating indicators")
-
 
             self.logging_period_label = tk.Label(self, text="Logging Period (s):", font=("Arial", scale_size))
             self.logging_period_label.grid(row=1, column=0,sticky="e")
@@ -483,7 +475,7 @@ try:
                     self.log_data(oxygen_value)
                     self.last_logged_time = current_time
                 previous_arduino_log_entry = arduino_data
-                self.update_indicators(arduino_data[1:11])
+                self.update_indicators(arduino_data[1:10])
             except serial.serialutil.SerialException as e:
                 pass
             except Exception as e:
@@ -631,6 +623,3 @@ try:
             app.server.stop()
 except Exception as e:
     traceback.print_exc()
-
-
-    
