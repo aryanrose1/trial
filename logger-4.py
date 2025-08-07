@@ -270,44 +270,92 @@ try:
 
             self.last_logged_time = time.time()
 
-            commands = ["U41", "U42", "U51", "U52", "U61", "U62", "U71", "U72"]
+            # ------------------------------------------------------------------
+            #  ENTRY BOXES AND TOGGLE BUTTONS
+            #  V04  = mixing air  (ON / OFF)   -> U41  U42   (+ toggle U43)
+            #  V05  = 3-way valve (CW / CCW)   -> U51  U52   (+ toggle U53)
+            #  V07  = scouring air (ON / OFF)  -> U71  U72   (+ toggle U73)
+            # ------------------------------------------------------------------
+            
+            cmd_pairs   = [("U41", "U42"),       # V04  mixing
+                           ("U51", "U52"),       # V05  3-way
+                           ("U71", "U72")]       # V07  scouring
+            
+            toggle_cmds = ["U43", "U53", "U73"]  # one per row (same order)
+            
+            valve_numbers = [4, 5, 7]            # for the label text
+            self.entries  = [[None, None] for _ in range(3)]
+            
+            for i, (cmd_on, cmd_off) in enumerate(cmd_pairs):
+                for j, cmd in enumerate((cmd_on, cmd_off)):
+                    # ---------- label text (ON/OFF vs CW/CCW) ----------
+                    if i == 1:                                   # V05 row
+                        setpoint = " CW" if j == 0 else " CCW"
+                    else:                                        # V04 & V07 rows
+                        setpoint = " ON" if j == 0 else " OFF"
+                    state = f"V0{valve_numbers[i]}{setpoint}"
+            
+                    entry_label = tk.Label(self, text=f"{state} (s)",
+                                           font=("Arial", scale_size))
+                    entry_label.grid(row=i*2 + j + button_start, column=0, sticky="e")
+            
+                    # ---------- entry widget ----------
+                    entry_widget = tk.Entry(self, font=("Arial", scale_size), width=5)
+                    entry_widget.grid(row=i*2 + j + button_start, column=1)
+                    entry_widget.insert(0, 5)                     # default seconds
+                    self.entries[i][j] = entry_widget
+            
+                    # ---------- 'Update' button ----------
+                    send_btn = tk.Button(self, text="Update", font=("Arial", scale_size),
+                                         command=partial(self.send_string, cmd, entry_widget))
+                    send_btn.grid(row=i*2 + j + button_start, column=2, sticky="w")
+            
+            # ---------- one 'Toggle' button per valve row ----------
+            for i, tcmd in enumerate(toggle_cmds):
+                tog_btn = tk.Button(self, text="Toggle", font=("Arial", scale_size),
+                                    command=partial(self.send_string, tcmd,
+                                                    self.entries[i][0]))  # pass any entry widget
+                tog_btn.grid(row=i + 7, column=4, sticky="w")
+            # ------------------------------------------------------------------
 
-            self.entries = [[None for _ in range(2)] for _ in range(4)]
-            try:
-                for i in range(4):
-                    for j in range(2):
-                        command = commands[i * 2 + j]
-                        valveNumber = i + 4
-                        setpoint = ""
-                        if i < 2 and j == 0:
-                            setpoint = " CW"
-                        elif i < 2 and j == 1:
-                            setpoint = " CCW"
-                        elif j == 0:
-                            setpoint = " ON"
-                        elif j == 1:
-                            setpoint = " OFF"
-                        state = f"V0" + str(valveNumber) + setpoint
-                        entry_label = tk.Label(self, text= state+" (s)", font=("Arial", scale_size))
-                        entry_label.grid(row=i*2 +j +button_start , column=0,sticky="e")
-                        entry_widget = tk.Entry(self, font=("Arial", scale_size), width=5)
-                        entry_widget.grid(row=i*2 +j +button_start, column=1)
-                        entry_widget.insert(0, i)
+            # commands = ["U41", "U42", "U51", "U52", "U61", "U62", "U71", "U72"]
 
-                        self.entries[i][j] = entry_widget
+            # self.entries = [[None for _ in range(2)] for _ in range(4)]
+            # try:
+            #     for i in range(4):
+            #         for j in range(2):
+            #             command = commands[i * 2 + j]
+            #             valveNumber = i + 4
+            #             setpoint = ""
+            #             if i < 2 and j == 0:
+            #                 setpoint = " CW"
+            #             elif i < 2 and j == 1:
+            #                 setpoint = " CCW"
+            #             elif j == 0:
+            #                 setpoint = " ON"
+            #             elif j == 1:
+            #                 setpoint = " OFF"
+            #             state = f"V0" + str(valveNumber) + setpoint
+            #             entry_label = tk.Label(self, text= state+" (s)", font=("Arial", scale_size))
+            #             entry_label.grid(row=i*2 +j +button_start , column=0,sticky="e")
+            #             entry_widget = tk.Entry(self, font=("Arial", scale_size), width=5)
+            #             entry_widget.grid(row=i*2 +j +button_start, column=1)
+            #             entry_widget.insert(0, i)
 
-                        send_button = tk.Button(self, text=f"Update", font=("Arial", scale_size),
-                                                command=partial(self.send_string, command, entry_widget))
-                        send_button.grid(row=i*2 +j +button_start, column=2,sticky="w")
-            except:
-                print("Error in creating entries")
-            try:
-                for i in range(4):
-                    send_button = tk.Button(self, text=f"Toggle", font=("Arial", scale_size),
-                                                command=partial(self.send_string, "U" + str(i+4)+"3",entry_widget))
-                    send_button.grid(row=i +7, column=4,sticky="w")
-            except:
-                print("Error in creating toggle buttons")
+            #             self.entries[i][j] = entry_widget
+
+            #             send_button = tk.Button(self, text=f"Update", font=("Arial", scale_size),
+            #                                     command=partial(self.send_string, command, entry_widget))
+            #             send_button.grid(row=i*2 +j +button_start, column=2,sticky="w")
+            # except:
+            #     print("Error in creating entries")
+            # try:
+            #     for i in range(4):
+            #         send_button = tk.Button(self, text=f"Toggle", font=("Arial", scale_size),
+            #                                     command=partial(self.send_string, "U" + str(i+4)+"3",entry_widget))
+            #         send_button.grid(row=i +7, column=4,sticky="w")
+            # except:
+            #     print("Error in creating toggle buttons")
 
 
             self.update_values()
